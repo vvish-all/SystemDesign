@@ -37,19 +37,15 @@ public class ParkingService {
 
     public ParkingSpot parkVehicle(Vehicle vehicle, Gate entryGate){
 
-        if(parkingLot.isFull()) {
+        if (!parkingLot.reserveSpot()) {
             System.out.println("Parking Lot is full!!!");
             return null;
         }
         ParkingSpot parkingSpot = spotFindingStrategy.findParkingSpot(entryGate.getFloorNumber(),vehicle.getVehicleType(), validationChain);
 
-        if(parkingSpot == null) return null;
-
-        parkingSpot.setAvailable(false);
-        parkingLot.setCountSpots(parkingLot.getCountSpots()-1);
-
-        if(parkingLot.getCountSpots()<=0){
-            parkingLot.setFull(true);
+        if(parkingSpot == null || !parkingSpot.tryOccupy(vehicle)){
+            parkingLot.releaseSpot();
+            return null;
         }
 
         System.out.println("vehicle id: "+vehicle.getId() +" is parked at spot id: " + parkingSpot.getId());
@@ -64,15 +60,14 @@ public class ParkingService {
         Vehicle vehicle= parkingTicket.getVehicle();
         ParkingSpot parkingSpot = parkingTicket.getParkingSpot();
 
+        parkingSpot.vacate();
+        parkingLot.releaseSpot();
+
         vehicle.setStatus(VehicleStatus.EXITED);
-        parkingSpot.setAvailable(true);
-        parkingSpot.setVehicleParked(null);
 
         parkingTicket.setTicketStatus(TicketStatus.COMPLETED);
         parkingTicket.setExitTime(LocalDateTime.now());
 
-        parkingLot.setCountSpots(parkingLot.getCountSpots()+1);
-        parkingLot.setFull(false);
         return parkingTicket;
     }
 

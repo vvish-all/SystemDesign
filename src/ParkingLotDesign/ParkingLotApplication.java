@@ -100,6 +100,8 @@ public class ParkingLotApplication {
             vehicleQueue.add(vehicle);
         }
 
+        System.out.println("Total count of available Parking spots:"+ parkingLot.getCountSpots());
+
         //parking service
         List<SpotValidationStrategy> validations = List.of(new BiggerOrEqualStrategy());
         ParkingService parkingService = new ParkingService(new NearestSpotStrategy(),validations);
@@ -133,7 +135,12 @@ public class ParkingLotApplication {
 
                 Attendant myAttendant = null;
                         try {
-                            myAttendant =freeAttendants.take();
+                            myAttendant =freeAttendants.poll(2,TimeUnit.SECONDS);
+                            if(myAttendant==null){
+                                System.out.println("No Attendant is available , adding vehicle back in queue");
+                                vehicleQueue.add(vehicle);
+                                return;
+                            }
                             myAttendant.setStatus(AttendantStatus.BUSY);
                             System.out.println(myAttendant.getName() + " is serving parking of vehicle id " + vehicle.getId());
                             ParkingSpot parkingSpot = parkingService.parkVehicle(vehicle, parkingLot.getEntryGates().get((int) (Math.random() * numberOfFloors)));
@@ -160,12 +167,17 @@ public class ParkingLotApplication {
                             }
                         }
             });
-
-
-
         }
 
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         System.out.println(parkingLot.getFloors());
+        System.out.println("Total count of available Parking spots:"+ parkingLot.getCountSpots());
+
 
 //        //simulating time elapse
 //        System.out.println("Simulating time elapse");
@@ -176,27 +188,45 @@ public class ParkingLotApplication {
 //        }
 //        System.out.println("time elapsed");
 
+        executorService = Executors.newFixedThreadPool(attendants.size());
+
         while(!tickets.isEmpty()){
 
             ParkingTicket ticket = tickets.poll();
-            //find free attendant
-            Attendant myAttendent = null;
-            while(myAttendent == null){
-                for(Attendant attendant : attendants){
-                    if(attendant.getStatus()== AttendantStatus.FREE){
-                        myAttendent = attendant;
-                        myAttendent.setStatus(AttendantStatus.BUSY);
-                        break;
+
+
+            executorService.submit(()-> {
+                Attendant myAttendent = null;
+                try {
+                    myAttendent = freeAttendants.take();
+                    System.out.println(myAttendent.getName() + " is serving exit of vehicle id " + ticket.getVehicle().getId());
+                    ParkingTicket parkingTicket = parkingService.processExit(ticket, parkingLot.getExitGates().get((int) (Math.random() * numberOfFloors)));
+                    System.out.println("Exit time:" + parkingTicket.getExitTime());
+                    myAttendent.setStatus(AttendantStatus.FREE);
+                    System.out.println(myAttendent.getName() + " is free to serve!!");
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    if (myAttendent != null) {
+                        freeAttendants.offer(myAttendent);
+                        myAttendent.setStatus(AttendantStatus.FREE);
+                        System.out.println(myAttendent.getName() + " is free to serve!!");
                     }
                 }
-            }
-            System.out.println(myAttendent.getName()+" is serving exit of vehicle id "+ ticket.getVehicle().getId());
-            ParkingTicket parkingTicket = parkingService.processExit(ticket, parkingLot.getExitGates().get((int)(Math.random()*numberOfFloors)));
-            System.out.println("Exit time:" +parkingTicket.getExitTime());
-            myAttendent.setStatus(AttendantStatus.FREE);
-            System.out.println(myAttendent.getName()+" is free to serve!!");
+            });
 
         }
+
+        executorService.shutdown();
+        try {
+            executorService.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println(parkingLot.getFloors());
+        System.out.println("Total count of available Parking spots:"+ parkingLot.getCountSpots());
+
+
 
         System.out.println("________END_________");
 

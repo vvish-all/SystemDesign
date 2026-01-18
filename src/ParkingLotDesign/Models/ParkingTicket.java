@@ -4,12 +4,13 @@ import ParkingLotDesign.Entities.Vehicle;
 import ParkingLotDesign.Enums.TicketStatus;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.Synchronized;
 
 import java.time.LocalDateTime;
 
 
-@Setter
-@Getter
+@Setter(onMethod_ = @Synchronized)
+@Getter(onMethod_ = @Synchronized)
 public class ParkingTicket {
     private long id;
     private LocalDateTime entryTime;

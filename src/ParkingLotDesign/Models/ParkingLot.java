@@ -4,13 +4,15 @@ import ParkingLotDesign.Enums.GateType;
 import ParkingLotDesign.Startegy.SpotFindingStategy.SpotFindingStrategy;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.Synchronized;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 
 
-@Setter
-@Getter
+@Setter(onMethod_ = @Synchronized)
+@Getter(onMethod_ = @Synchronized)
 public class ParkingLot {
     private long id;
     private String name;
@@ -19,13 +21,14 @@ public class ParkingLot {
     private List<Gate> entryGates;
     private List<Gate> exitGates;
     private List<DisplayBoard> displayBoards;
-    private int countSpots;
-    private boolean isFull;
+    private volatile int countSpots;
+    private volatile boolean isFull;
 
     private static ParkingLot instance = null;
 
     private SpotFindingStrategy spotFindingStartegy;
 
+    private final ReentrantLock capacityLock = new ReentrantLock();
 
 
     private ParkingLot() {
@@ -45,6 +48,32 @@ public class ParkingLot {
             }
         }
         return instance;
+    }
+
+    public  boolean reserveSpot(){
+        capacityLock.lock();
+        try {
+            if(isFull || countSpots <= 0){
+                return false;
+            }
+            countSpots--;
+            if(countSpots<=0) {
+                isFull = true;
+            }
+            return true;
+        }finally {
+            capacityLock.unlock();
+        }
+    }
+
+    public void releaseSpot(){
+        capacityLock.lock();
+        try {
+            countSpots+=1;
+            isFull = false;
+        }finally {
+            capacityLock.unlock();
+        }
     }
 
     public void addFloor(Floor floor){
